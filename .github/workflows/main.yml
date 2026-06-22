@@ -8,40 +8,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. Start the Android Emulator inside Docker with a Web-VNC interface
+      # 1. Start a lightweight Nexus 5 running Android 14
       - name: Run Docker Android
         run: |
           docker run -d -p 6080:6080 \
-            -e EMULATOR_DEVICE="Samsung Galaxy S10" \
+            -e EMULATOR_DEVICE="Nexus 5" \
             -e WEB_VNC=true \
             --device /dev/kvm \
             --name android-container \
-            budtmo/docker-android:emulator_11.0
+            budtmo/docker-android:emulator_14.0
 
-      # 2. Install and launch Ngrok directly via bash script (Fixes the version error)
+      # 2. Install and launch Ngrok directly via bash script
       - name: Start Ngrok Tunnel
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
-          # Download and install the official Ngrok binary
           curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
           echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
           sudo apt-get update && sudo apt-get install ngrok
           
-          # Configure Ngrok auth
           ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-          
-          # Start the tunnel on port 6080 in the background
           ngrok http 6080 --log=stdout > ngrok.log &
           
-          # Wait a few seconds for the tunnel to boot up
           sleep 5
           
-          # Print the public URL clearly into your GitHub Actions build logs
           echo "============================================="
-          echo "YOUR LIVE EMULATOR IS READY AT THE LINK BELOW:"
+          echo "YOUR LIVE ANDROID 14 EMULATOR IS READY:"
           curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
           echo "============================================="
           
-          # Keep the action running for 1 hour so it doesn't instantly close
           sleep 3600
