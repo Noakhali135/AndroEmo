@@ -1,0 +1,28 @@
+name: Live Mobile Emulator Link
+on: [workflow_dispatch] # Triggers manually when you need it
+
+jobs:
+  launch-emulator:
+    runs-on: ubuntu-latest # Docker works great here
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. Start the Android Emulator inside Docker with a Web-VNC interface
+      - name: Run Docker Android
+        run: |
+          docker run -d -p 6080:6080 \
+            -e EMULATOR_DEVICE="Samsung Galaxy S10" \
+            -e WEB_VNC=true \
+            --device /dev/kvm \
+            --name android-container \
+            budtmo/docker-android:emulator_11.0
+
+      # 2. Expose the Docker container to a public link using Ngrok
+      - name: Create Public Tunnel
+        uses: luisboto/ngrok-tunnel-action@v1
+        with:
+          port: 6080
+          tunnel_type: http
+          timeout: 1h # Keeps the action alive for 1 hour so you can test
+          ngrok_authtoken: ${{ secrets.NGROK_AUTH_TOKEN }}
