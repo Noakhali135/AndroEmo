@@ -1,9 +1,9 @@
 name: Live Mobile Emulator Link
-on: [workflow_dispatch] # Triggers manually when you need it
+on: [workflow_dispatch]
 
 jobs:
   launch-emulator:
-    runs-on: ubuntu-latest # Docker works great here
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,11 +18,30 @@ jobs:
             --name android-container \
             budtmo/docker-android:emulator_11.0
 
-      # 2. Expose the Docker container to a public link using Ngrok
-      - name: Create Public Tunnel
-        uses: luisboto/ngrok-tunnel-action@v1
-        with:
-          port: 6080
-          tunnel_type: http
-          timeout: 1h # Keeps the action alive for 1 hour so you can test
-          ngrok_authtoken: ${{ secrets.NGROK_AUTH_TOKEN }}
+      # 2. Install and launch Ngrok directly via bash script (Fixes the version error)
+      - name: Start Ngrok Tunnel
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          # Download and install the official Ngrok binary
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt-get update && sudo apt-get install ngrok
+          
+          # Configure Ngrok auth
+          ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
+          
+          # Start the tunnel on port 6080 in the background
+          ngrok http 6080 --log=stdout > ngrok.log &
+          
+          # Wait a few seconds for the tunnel to boot up
+          sleep 5
+          
+          # Print the public URL clearly into your GitHub Actions build logs
+          echo "============================================="
+          echo "YOUR LIVE EMULATOR IS READY AT THE LINK BELOW:"
+          curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+          echo "============================================="
+          
+          # Keep the action running for 1 hour so it doesn't instantly close
+          sleep 3600
