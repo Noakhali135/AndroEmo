@@ -1,4 +1,4 @@
-name: Live Mobile Emulator Link
+name: Smooth VNC Mobile Emulator Link
 on: [workflow_dispatch]
 
 jobs:
@@ -8,18 +8,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. Start a lightweight Nexus 5 running Android 14
+      # 1. Map both port 6080 (Web) and port 5900 (Native VNC App Connection)
       - name: Run Docker Android
         run: |
-          docker run -d -p 6080:6080 \
+          docker run -d -p 6080:6080 -p 5900:5900 \
             -e EMULATOR_DEVICE="Nexus 5" \
             -e WEB_VNC=true \
             --device /dev/kvm \
             --name android-container \
             budtmo/docker-android:emulator_14.0
 
-      # 2. Install and launch Ngrok directly via bash script
-      - name: Start Ngrok Tunnel
+      # 2. Boot Ngrok using TCP protocol instead of HTTP
+      - name: Start Ngrok TCP Tunnel
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: |
@@ -28,12 +28,14 @@ jobs:
           sudo apt-get update && sudo apt-get install ngrok
           
           ngrok config add-authtoken "$NGROK_AUTH_TOKEN"
-          ngrok http 6080 --log=stdout > ngrok.log &
+          
+          # Notice 'tcp 5900' replaces 'http 6080'
+          ngrok tcp 5900 --log=stdout > ngrok.log &
           
           sleep 5
           
           echo "============================================="
-          echo "YOUR LIVE ANDROID 14 EMULATOR IS READY:"
+          echo "YOUR SMOOTH VNC ADDRESS IS READY:"
           curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
           echo "============================================="
           
